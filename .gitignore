@@ -1,0 +1,20 @@
+# Entornos virtuales
+.venv/
+venv/
+env/
+
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+
+# Secretos y configuración local
+.env
+
+# Base de datos local
+*.db
+*.sqlite3
+
+# Editores
+.vscode/
+.idea/
