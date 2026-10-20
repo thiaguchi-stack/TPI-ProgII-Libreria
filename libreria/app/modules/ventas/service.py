@@ -9,7 +9,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
-from app.models import Libro, RenglonVenta, Venta
+from app.models import Cliente, Libro, RenglonVenta, Venta
 
 logger = logging.getLogger(__name__)
 
@@ -34,7 +34,10 @@ async def get_venta(db: AsyncSession, venta_id: int):
 async def list_ventas(db: AsyncSession, limit: int, offset: int):
     res = await db.execute(
         select(Venta)
-        .options(selectinload(Venta.cliente), selectinload(Venta.renglones))
+        .options(
+            selectinload(Venta.cliente),
+            selectinload(Venta.renglones).selectinload(RenglonVenta.libro),
+        )
         .limit(limit)
         .offset(offset)
     )
@@ -45,11 +48,19 @@ async def create_venta(db: AsyncSession, payload, background_tasks):
     if len({r.libro_id for r in payload.renglones}) != len(payload.renglones):
         raise ValueError("libro duplicado en renglones")
 
+    cliente = await db.get(Cliente, payload.cliente_id)
+    if cliente is None:
+        raise ValueError("cliente inexistente")
+
     libro_ids = [r.libro_id for r in payload.renglones]
-    res = await db.execute(select(Libro).where(Libro.id.in_(libro_ids)))
+    res = await db.execute(select(Libro).where(Libro.id.in_(libro_ids)).with_for_update())
     libros = {l.id: l for l in res.scalars().all()}
     if len(libros) != len(set(libro_ids)):
         raise ValueError("libro inexistente")
+
+    for r in payload.renglones:
+        if libros[r.libro_id].stock < r.cantidad:
+            raise ValueError("stock insuficiente")
 
     venta = Venta(cliente_id=payload.cliente_id, total=Decimal("0.00"))
     db.add(venta)
@@ -61,6 +72,8 @@ async def create_venta(db: AsyncSession, payload, background_tasks):
         precio = libro.precio
         subtotal = precio * r.cantidad
         total += subtotal
+        libro.stock -= r.cantidad
+        db.add(libro)
         db.add(
             RenglonVenta(
                 venta_id=venta.id,

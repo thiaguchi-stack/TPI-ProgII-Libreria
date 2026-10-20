@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from datetime import datetime
 from decimal import Decimal
 from typing import List, Optional
 
@@ -32,5 +33,14 @@ class VentaRead(BaseModel):
     total: Decimal
     cliente: dict
     renglones: List[RenglonRead]
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+class VentaResumen(BaseModel):
+    id: int
+    cliente_id: int
+    fecha: datetime
+    total: Decimal
 
     model_config = ConfigDict(from_attributes=True)

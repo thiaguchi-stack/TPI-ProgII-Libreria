@@ -16,6 +16,7 @@ async def create(payload: schemas.ClienteCreate, db: AsyncSession = Depends(get_
     try:
         return await service.create_cliente(db, payload)
     except IntegrityError:
+        await db.rollback()
         raise HTTPException(status_code=409, detail="Error de unicidad")
 
 
@@ -35,6 +36,7 @@ async def patch_(cliente_id: int, payload: schemas.ClienteUpdate, db: AsyncSessi
     try:
         return await service.update_cliente(db, obj, payload)
     except IntegrityError:
+        await db.rollback()
         raise HTTPException(status_code=409, detail="Error de unicidad")
 
 
@@ -48,10 +50,11 @@ async def perfil(cliente_id: int, payload: schemas.PerfilCreate, db: AsyncSessio
     try:
         return await service.crear_perfil(db, cliente_id, payload)
     except IntegrityError:
+        await db.rollback()
         raise HTTPException(status_code=409, detail="Error de unicidad")
 
 
-@router.get("/{cliente_id}/ventas")
+@router.get("/{cliente_id}/ventas", response_model=list[vschemas.VentaResumen])
 async def ventas(cliente_id: int, db: AsyncSession = Depends(get_session)):
     cli = await service.get_cliente(db, cliente_id)
     if cli is None:

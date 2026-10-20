@@ -4,7 +4,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import joinedload, selectinload
 
-from app.models import Libro, LibroAutor
+from app.models import Autor, Genero, Libro, LibroAutor
 from app.modules.libros.schemas import LibroCreate, LibroUpdate
 
 
@@ -22,6 +22,14 @@ async def get_libro(db: AsyncSession, libro_id: int):
 
 
 async def create_libro(db: AsyncSession, payload: LibroCreate):
+    autor_ids = [a.autor_id for a in payload.autores]
+    if len(autor_ids) != len(set(autor_ids)):
+        raise ValueError("autor duplicado en autores")
+    if payload.genero_id is not None:
+        res = await db.execute(select(Genero.id).where(Genero.id == payload.genero_id))
+        if res.scalar_one_or_none() is None:
+            raise ValueError(f"genero inexistente: {payload.genero_id}")
+
     libro = Libro(
         isbn=payload.isbn,
         titulo=payload.titulo,
@@ -32,6 +40,13 @@ async def create_libro(db: AsyncSession, payload: LibroCreate):
     )
     db.add(libro)
     await db.flush()
+    if autor_ids:
+        res = await db.execute(select(Autor.id).where(Autor.id.in_(autor_ids)))
+        encontrados = set(res.scalars().all())
+        faltantes = set(autor_ids) - encontrados
+        if faltantes:
+            await db.rollback()
+            raise ValueError(f"autor inexistente: {sorted(faltantes)}")
     for a in payload.autores:
         db.add(
             LibroAutor(

@@ -14,7 +14,12 @@ router = APIRouter(prefix="/libros", tags=["libros"])
 async def create(payload: schemas.LibroCreate, db: AsyncSession = Depends(get_session)):
     try:
         return await service.create_libro(db, payload)
+    except ValueError as e:
+        if "inexistente" in str(e):
+            raise HTTPException(status_code=404, detail=str(e))
+        raise HTTPException(status_code=422, detail=str(e))
     except IntegrityError:
+        await db.rollback()
         raise HTTPException(status_code=409, detail="Error de unicidad")
 
 
@@ -45,4 +50,5 @@ async def patch_(libro_id: int, payload: schemas.LibroUpdate, db: AsyncSession =
     try:
         return await service.update_libro(db, obj, payload)
     except IntegrityError:
+        await db.rollback()
         raise HTTPException(status_code=409, detail="Error de unicidad")

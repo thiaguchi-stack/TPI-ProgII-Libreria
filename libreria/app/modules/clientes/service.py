@@ -11,8 +11,7 @@ async def create_cliente(db, payload):
     obj = Cliente(**payload.model_dump())
     db.add(obj)
     await db.commit()
-    await db.refresh(obj)
-    return obj
+    return await get_cliente(db, obj.id)
 
 
 async def get_cliente(db, cliente_id):
@@ -29,7 +28,6 @@ async def update_cliente(db, obj, payload):
         setattr(obj, k, v)
     db.add(obj)
     await db.commit()
-    await db.refresh(obj)
     return await get_cliente(db, obj.id)
 
 
